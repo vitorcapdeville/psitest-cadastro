@@ -1,3 +1,5 @@
 fastapi
 sqlmodel
 sqlalchemy-utils
+pydantic-settings
+httpx

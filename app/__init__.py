@@ -1,31 +1,21 @@
 from typing import Annotated
 
+import httpx
 from email_validator import EmailNotValidError, validate_email
-from fastapi import Body, Depends, FastAPI, HTTPException, Query, status
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Query, Depends, FastAPI, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy_utils import database_exists
 from sqlmodel import Session, select
 
 from app.database import criar_db_e_tabelas, engine, get_session
-from app.models import User, LoginInfo, UserUpdate
+from app.models import User, UserUpdate
+from app.settings import Settings, get_settings
 
 if not database_exists(engine.url):
     criar_db_e_tabelas()
 
 
 app = FastAPI()
-
-origins = [
-    "http://localhost:5173",
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 
 def get_user(session: Session, email: str) -> User | None:
@@ -35,18 +25,19 @@ def get_user(session: Session, email: str) -> User | None:
 
 @app.post("/signup")
 async def cadastrar_usuario(
-    user: Annotated[LoginInfo, Body(...)],
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     name: Annotated[str, Query(...)],
     matricula: Annotated[str, Query(...)],
     session: Annotated[Session, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> User:
-    if get_user(session, user.email):
+    if get_user(session, form_data.username):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="E-mail já cadastrado.",
         )
     try:
-        emailinfo = validate_email(user.email, check_deliverability=True)
+        emailinfo = validate_email(form_data.username, check_deliverability=True)
         email = emailinfo.normalized
     except EmailNotValidError:
         raise HTTPException(
@@ -54,21 +45,22 @@ async def cadastrar_usuario(
             detail="E-mail inválido.",
         )
 
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            f"{settings.PSITEST_AUTH}/signup", data={"username": form_data.username, "password": form_data.password}
+        )
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code, detail=response.text)
+
     db_user = User(
         email=email,
         name=name,
         matricula=matricula,
-        verified=False,
     )
 
     session.add(db_user)
     session.commit()
     session.refresh(db_user)
-
-    # Emitir um evento na queue para que a rota de autenticaçao possa pegar
-    # A rota de autenticacao vai fazer o hash da senha e vai armazena-la
-    # A rota de autenticacao vai enviar um email para o usuario com um link para confirmar o email
-    # user.password
 
     return db_user
 
@@ -81,7 +73,7 @@ async def get_user_by_email(email: str, session: Session = Depends(get_session))
     return user
 
 
-@app.patch("/heroes/{user_email}")
+@app.patch("/users/{user_email}")
 def update_hero(user_email: str, user: UserUpdate, session: Session = Depends(get_session)):
     db_user = get_user(session, user_email)
     if not db_user:

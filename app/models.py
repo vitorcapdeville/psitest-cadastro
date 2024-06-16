@@ -8,11 +8,6 @@ class User(SQLModel, table=True):
     full_name: str | None = None
 
 
-class LoginInfo(SQLModel):
-    email: str
-    password: str
-
-
 class UserUpdate(SQLModel):
     name: str | None = None
     matricula: str | None = None
