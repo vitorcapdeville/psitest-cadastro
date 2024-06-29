@@ -2,12 +2,13 @@ from typing import Annotated
 
 import httpx
 from email_validator import EmailNotValidError, validate_email
-from fastapi import Query, Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy_utils import database_exists
 from sqlmodel import Session, select
 
 from app.database import criar_db_e_tabelas, engine, get_session
+from app.dependencies import decode_token
 from app.models import User, UserUpdate
 from app.settings import Settings, get_settings
 
@@ -65,16 +66,23 @@ async def cadastrar_usuario(
     return db_user
 
 
-@app.get("/users/{email}")
-async def get_user_by_email(email: str, session: Session = Depends(get_session)) -> User:
-    user = get_user(session, email)
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado.")
+@app.get("/users/me")
+async def get_user_details(
+    session: Annotated[Session, Depends(get_session)],
+    user_email: Annotated[str, Depends(decode_token)],
+) -> User:
+    user = get_user(session, user_email)
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
     return user
 
 
-@app.patch("/users/{user_email}")
-def update_hero(user_email: str, user: UserUpdate, session: Session = Depends(get_session)):
+@app.patch("/users/me")
+async def update_user_details(
+    user_email: Annotated[str, Depends(decode_token)],
+    user: UserUpdate,
+    session: Annotated[Session, Depends(get_session)],
+):
     db_user = get_user(session, user_email)
     if not db_user:
         raise HTTPException(status_code=404, detail="E-mail não encontrado.")
