@@ -7,7 +7,8 @@ services:
       - 8003:80
     networks:
       - mynetwork
-    env_file: ".env"
+    environment:
+      PSITEST_AUTH: "http://auth:80"
 networks:
   mynetwork:
     external: true
