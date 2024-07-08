@@ -24,7 +24,7 @@ def get_user(session: Session, email: str) -> User | None:
     return session.exec(statement).one_or_none()
 
 
-@app.post("/signup")
+@app.post("/signup", description="Sign up a new user.")
 async def cadastrar_usuario(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     name: Annotated[str, Query(...)],
@@ -66,7 +66,7 @@ async def cadastrar_usuario(
     return db_user
 
 
-@app.get("/users/me")
+@app.get("/users/me", description="Get current user details.")
 async def get_user_details(
     session: Annotated[Session, Depends(get_session)],
     user_email: Annotated[str, Depends(decode_token)],
@@ -77,7 +77,7 @@ async def get_user_details(
     return user
 
 
-@app.patch("/users/me")
+@app.patch("/users/me", description="Update current user details.")
 async def update_user_details(
     user_email: Annotated[str, Depends(decode_token)],
     user: UserUpdate,

@@ -6,9 +6,9 @@ services:
     ports:
       - 8003:80
     networks:
-      - mynetwork
+      - psitest
     environment:
       PSITEST_AUTH: "http://auth:80"
 networks:
-  mynetwork:
+  psitest:
     external: true
